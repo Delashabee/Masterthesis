@@ -21,5 +21,5 @@ To use the programs in this repository, ensure that the following libraries are 
 
 The code can be compiled using **Visual Studio 2019** with support for **C++ 14** and is intended to run on **Windows 10**. For use on other systems, please verify compatibility, particularly with file reading/writing functions and multithreading features, as adjustments may be needed.
 
-## Note
-Change "const static size_t maxSize = 100000;" to "const static size_t maxSize = 1000" in file OcTreeKey.h, so that the code will run faster.
+## GVPN
+This directory contains my neural network implementations. The model.py file stores several neural network models, and running this file directly allows you to test the output results of the models. The dataset.py script is designed to preprocess the training data. You can train the neural networks by running train.py.
