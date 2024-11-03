@@ -4,10 +4,10 @@ This repository supports my research on 3D scanning and modeling of unknown obje
 
 ## Datagenerator
 
-The `datagenerator` directory contains programs that generate training data required for 3D modeling tasks. This module can operate in multiple modes to create different types of data outputs:
+The `Datagenerator` directory contains programs that generate training data. This module can operate in multiple modes to create different types of data outputs:
 
-- **Voxel Data Generation**: Produces 3D voxel grids that represent object structures.
-- **Point Cloud Data Generation**: Extracts point cloud representations for various objects.
+- **Voxel Data Generation**
+- **Point Cloud Data Generation**
 - **Coverage Calculation**: Computes coverage metrics to evaluate data completeness.
 
 ### Requirements
@@ -21,4 +21,5 @@ To use the programs in this repository, ensure that the following libraries are 
 
 The code can be compiled using **Visual Studio 2019** with support for **C++ 14** and is intended to run on **Windows 10**. For use on other systems, please verify compatibility, particularly with file reading/writing functions and multithreading features, as adjustments may be needed.
 
-We hope this repository proves useful in advancing your research and development efforts in 3D scanning and robotic modeling.
+## Note
+Change "const static size_t maxSize = 100000;" to "const static size_t maxSize = 1000" in file OcTreeKey.h, so that the code will run faster.
