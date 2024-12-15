@@ -2,7 +2,9 @@
 #include <unordered_set>
 #include <algorithm>
 #include <iostream>
-#include <direct.h>
+// #include <direct.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <fstream>  
 #include <string>  
 #include <vector> 
@@ -14,7 +16,7 @@
 #include <mutex>
 #include <map>
 #include <set>
-#include <io.h>
+// #include <io.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
