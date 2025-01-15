@@ -173,11 +173,16 @@ public:
 		object_center_world(0) /= points.size();
 		object_center_world(1) /= points.size();
 		object_center_world(2) /= points.size();
-		predicted_size = 0.1;
+		//������Զ��
+		predicted_size = 0.0;
+		for (auto& ptr : points) {
+			predicted_size = max(predicted_size, (object_center_world - ptr).norm());
+		}
+		predicted_size *= 17.0 / 16.0;
 		cout << "object's pos is ("<< object_center_world(0) << "," << object_center_world(1) << "," << object_center_world(2) << ") and size is " << predicted_size << endl;
 		for (int i = 0; i < share_data->pt_sphere.size(); i++) {
-			//if (share_data->pt_sphere[i][2] < 0) continue;
-			double scale = 1.0 / share_data->pt_norm * 0.3; //predicted_size * sqrt(3) * ?
+			if (share_data->pt_sphere[i][2] < 0) continue;
+			double scale = 1.0 / share_data->pt_norm * 0.4; //predicted_size * sqrt(3) * ?
 			View view(Eigen::Vector3d(share_data->pt_sphere[i][0]* scale + object_center_world(0), share_data->pt_sphere[i][1] * scale + object_center_world(1), share_data->pt_sphere[i][2] * scale + object_center_world(2)));
 			//cout << share_data->pt_sphere[i][0] * scale << " " << share_data->pt_sphere[i][1] * scale << " " << share_data->pt_sphere[i][2] * scale << endl;
 			views.push_back(view);

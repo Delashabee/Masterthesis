@@ -3,9 +3,10 @@
 #include <algorithm>
 #include <iostream>
 // #include <direct.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <sys/types.h>
+#include <filesystem>
 #include <fstream>  
+#include <stdio.h>  
 #include <string>  
 #include <vector> 
 #include <thread>
@@ -34,6 +35,7 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/random_sample.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -175,17 +177,8 @@ static void rs2_deproject_pixel_to_point(float point[3], const struct rs2_intrin
 	point[2] = depth;
 }
 
-#define OursIG 0
-#define OA 1
-#define UV 2
-#define RSE 3
-#define APORA 4
-#define Kr 5
-#define NBVNET 6
-#define PCNBV 7
-#define OursSCOP 8
-
-string shape_net_path = "D:\\Software\\PC-NBV\\models\\ShapeNetCore.v1";
+#define NBVSampleMethod 0
+#define LongTailSampleMethod 1
 
 class Share_Data
 {
@@ -216,6 +209,7 @@ public:
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_ground_truth;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_final;
 	bool move_wait;
+	map<string, double> mp_scale;
 
 	//�˲��ͼ
 	octomap::ColorOcTree* octo_model;
@@ -263,24 +257,35 @@ public:
 	int voxels_in_BBX;   //��ͼvoxel����
 	double init_entropy; //��ͼ��Ϣ��
 
+	string pre_path;
+	string gt_path;
 	string save_path;
+	string save_path_nbvnet;
+	string save_path_pcnbv;
 
 	vector<vector<double>> pt_sphere;
 	double pt_norm;
 	double min_z_table;
 
-	Share_Data(string _config_file_path, string test_name = "", string path_name = "")
+	int need_case_1;
+	int sampling_method;
+	vector<long long> view_cases;
+
+	Share_Data(string _config_file_path, string test_name = "", int _sampling_method = -1,int _need_case_1 = -1)
 	{
 		process_cnt = -1;
 		yaml_file_path = _config_file_path;
 		//��ȡyaml�ļ�
 		cv::FileStorage fs;
 		fs.open(yaml_file_path, cv::FileStorage::READ);
+		fs["pre_path"] >> pre_path;
 		fs["model_path"] >> pcd_file_path;
 		fs["name_of_pcd"] >> name_of_pcd;
 		fs["method_of_IG"] >> method_of_IG;
 		fs["octomap_resolution"] >> octomap_resolution;
 		fs["ground_truth_resolution"] >> ground_truth_resolution;
+		fs["sampling_method"] >> sampling_method;
+		fs["need_case_1"] >> need_case_1;
 		fs["num_of_max_iteration"] >> num_of_max_iteration;
 		fs["show"] >> show;
 		fs["move_wait"] >> move_wait;
@@ -310,18 +315,60 @@ public:
 		fs["depth_scale"] >> depth_scale;
 		fs.release();
 		if (test_name != "") name_of_pcd = test_name;
-		if (path_name != "") {
-			pcd_file_path = shape_net_path +"\\"+ path_name + "\\";
-			name_of_pcd = "model";
-		}
+		if (_sampling_method != -1) sampling_method = _sampling_method;
+		if (_need_case_1 != -1) need_case_1 = _need_case_1;
 		//��ȡת����ģ�͵�pcd�ļ�
 		pcl::PointCloud<pcl::PointXYZ>::Ptr temp_pcd(new pcl::PointCloud<pcl::PointXYZ>);
 		cloud_pcd = temp_pcd;
 		if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_file_path + name_of_pcd + ".pcd", *cloud_pcd) == -1) {
 			cout << "Can not read 3d model file. Check." << endl;
 		}
+		//��תZ������
+		set<string> names_rotate;
+		names_rotate.insert("Armadillo");
+		names_rotate.insert("Asian_Dragon");
+		names_rotate.insert("Dragon");
+		names_rotate.insert("Stanford_Bunny");
+		names_rotate.insert("Happy_Buddha");
+		names_rotate.insert("Thai_Statue");
+		//names_rotate.insert("Lucy");
+		if (names_rotate.count(name_of_pcd)) {
+			pcl::transformPointCloud(*cloud_pcd, *cloud_pcd, get_toward_pose(4));
+		}
+		//������С����ˮ�ܱ���
+		mp_scale["Armadillo"] = 0.02;
+		mp_scale["Asian_Dragon"] = 0.05;
+		mp_scale["Dragon"] = 0.05;
+		mp_scale["Stanford_Bunny"] = 0.04;
+		mp_scale["Happy_Buddha"] = 0.07;
+		mp_scale["Thai_Statue"] = 0.25;
+		mp_scale["Lucy"] = 1.39;
+		mp_scale["LM11"] = 0.03;
+		mp_scale["LM12"] = 0.04;
+		mp_scale["obj_000001"] = 0.02;
+		mp_scale["obj_000002"] = 0.06;
+		mp_scale["obj_000004"] = 0.02;
+		mp_scale["obj_000005"] = 0.02;
+		mp_scale["obj_000007"] = 0.05;
+		mp_scale["obj_000008"] = 0.03;
+		mp_scale["obj_000009"] = 0.03;
+		mp_scale["obj_000010"] = 0.03;
+		mp_scale["obj_000011"] = 0.06;
+		mp_scale["obj_000012"] = 0.02;
+		mp_scale["obj_000018"] = 0.02;
+		mp_scale["obj_000020"] = 0.08;
+		mp_scale["obj_000021"] = 0.03;
+		mp_scale["obj_000022"] = 0.02;
+		mp_scale["obj_000023"] = 0.04;
+		mp_scale["obj_000024"] = 0.05;
+		mp_scale["obj_000025"] = 0.05;
+		mp_scale["obj_000026"] = 0.01;
+		mp_scale["obj_000027"] = 0.09;
+		mp_scale["obj_000028"] = 0.13;
+		mp_scale["obj_000029"] = 0.02;
+		mp_scale["obj_000030"] = 0.18;
 
-		octo_model = new octomap::ColorOcTree(octomap_resolution);
+		//octo_model = new octomap::ColorOcTree(octomap_resolution);
 		//octo_model->setProbHit(0.95);	//���ô�����������,��ʼ0.7
 		//octo_model->setProbMiss(0.05);	//���ô�����ʧ���ʣ���ʼ0.4
 		//octo_model->setClampingThresMax(1.0);	//���õ�ͼ�ڵ����ֵ����ʼ0.971
@@ -332,7 +379,7 @@ public:
 		//ground_truth_model->setProbMiss(0.05);	//���ô�����ʧ���ʣ���ʼ0.4
 		//ground_truth_model->setClampingThresMax(1.0);	//���õ�ͼ�ڵ����ֵ����ʼ0.971
 		//ground_truth_model->setClampingThresMin(0.0);	//���õ�ͼ�ڵ���Сֵ����ʼ0.1192
-		GT_sample = new octomap::ColorOcTree(octomap_resolution);
+		//GT_sample = new octomap::ColorOcTree(octomap_resolution);
 		//GT_sample->setProbHit(0.95);	//���ô�����������,��ʼ0.7
 		//GT_sample->setProbMiss(0.05);	//���ô�����ʧ���ʣ���ʼ0.4
 		//GT_sample->setClampingThresMax(1.0);	//���õ�ͼ�ڵ����ֵ����ʼ0.971
@@ -352,21 +399,26 @@ public:
 		cloud_final = temp;
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_gt(new pcl::PointCloud<pcl::PointXYZRGB>);
 		cloud_ground_truth = temp_gt;
-		save_path = "../industrial_label_data/" + name_of_pcd;
-		//save_path = "../coverage/" + to_string(num_of_views);
-		if (path_name != "") {
-			string path = pcd_file_path.substr(42);
-			for (int i = 0; i < path.size(); i++) {
-				if (path[i] == '\\') path[i] = '/';
-			}
-			save_path = "../industrial_label_data/" + path;
-			//save_path = "../coverage/" + path;
+		//path
+		//pre_path = "D:/Data/LongTail_MA-SCVP/";
+		gt_path = pre_path + "NBV_GT_label/";
+		pre_path += to_string(need_case_1) + "/";
+		if (sampling_method == NBVSampleMethod) {
+			save_path = pre_path + "MASCVP_NBVSample/" ;
+			save_path_nbvnet = pre_path + "NBVNET_NBVSample/";
+			save_path_pcnbv = pre_path + "PCNBV_NBVSample/";
 		}
-		//cout << "pcd and yaml files readed." << endl;
-		cout << "save_path is: " << save_path << endl;
+		else if (sampling_method == LongTailSampleMethod) {
+			save_path = pre_path + "MASCVP_LongTailSample/";
+			save_path_nbvnet = pre_path + "NBVNET_LongTailSample/";
+			save_path_pcnbv = pre_path + "PCNBV_LongTailSample/";
+		}
+		cout << "save_path_mascvp is: " << save_path << endl;
+		cout << "save_path_nbvnet is: " << save_path_nbvnet << endl;
+		cout << "save_path_pcnbv is: " << save_path_pcnbv << endl;
 		srand(clock());
 		//read viewspace
-		ifstream fin_sphere("../points_on_sphere/pack.3."+to_string(num_of_views)+".txt");
+		ifstream fin_sphere("../view_space.txt");
 		pt_sphere.resize(num_of_views);
 		for (int i = 0; i < num_of_views; i++) {
 			pt_sphere[i].resize(3);
@@ -377,6 +429,14 @@ public:
 		}
 		Eigen::Vector3d pt0(pt_sphere[0][0], pt_sphere[0][1], pt_sphere[0][2]);
 		pt_norm = pt0.norm();
+		//read view cases
+		ifstream fin_view_cases;
+		fin_view_cases.open("../test_view_cases.txt");
+		long long cas;
+		while (fin_view_cases >> cas) {
+			view_cases.push_back(cas);
+		}
+		//cout << "test view case num is: " << view_cases.size() << endl;
 	}
 
 	~Share_Data() {
@@ -445,11 +505,11 @@ public:
 		string temp;
 		for (int i = 0; i < cd.length(); i++)
 			if (cd[i] == '/') {
-				if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str());
+				if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0755);
 				temp += cd[i];
 			}
 			else temp += cd[i];
-		if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str());
+		if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0755);
 	}
 
 	void save_posetrans_to_disk(Eigen::Matrix4d& T, string cd, string name, int frames_cnt)
@@ -520,44 +580,51 @@ inline double pow2(double x) {
 	return x * x;
 }
 
-vector<string> getFilesList(string dir)
+namespace fs = std::filesystem;
+vector<string> getFilesList(const string& dir)
 {
-	vector<string> allPath;
-	// ��Ŀ¼�������"\\*.*"���е�һ������
-	string dir2 = dir + "\\*.*";
+    vector<string> allPath;
 
-	intptr_t handle;
-	_finddata_t findData;
+    // 如果目标路径不存在或不是目录，则直接返回空向量
+    if (!fs::exists(dir) || !fs::is_directory(dir))
+    {
+        cout << "Path not found or is not a directory: " << dir << endl;
+        return allPath;
+    }
 
-	handle = _findfirst(dir2.c_str(), &findData);
-	if (handle == -1) {// ����Ƿ�ɹ�
-		cout << "can not found the file ... " << endl;
-		return allPath;
-	}
-	do
-	{
-		if (findData.attrib & _A_SUBDIR) //�Ƿ�����Ŀ¼
-		{
-			//�����Ŀ¼Ϊ"."��".."���������һ��ѭ�������������Ŀ¼������������һ������
-			if (strcmp(findData.name, ".") == 0 || strcmp(findData.name, "..") == 0)
-				continue;
+    // 迭代该目录下的所有元素（文件 / 子目录）
+    for (const auto& entry : fs::directory_iterator(dir))
+    {
+        const auto& path = entry.path();
+        // 获取文件或子目录的名称（不包含路径）
+        string filename = path.filename().string();
 
-			// ��Ŀ¼�������"\\"����������Ŀ¼��������һ������
-			string dirNew = dir + "\\" + findData.name;
-			vector<string> tempPath = getFilesList(dirNew);
-			allPath.insert(allPath.end(), tempPath.begin(), tempPath.end());
-		}
-		else //������Ŀ¼�������ļ���������ļ������ļ��Ĵ�С
-		{
-			string filePath = dir + "\\" + findData.name;
-			string fileName = findData.name;
-			if (fileName == "model.pcd") {
-				allPath.push_back(dir.substr(shape_net_path.size()+1));
-				//cout << dir.substr(42) << endl;
-				//cout << filePath << "\t" << findData.size << " bytes.\n";
-			}
-		}
-	} while (_findnext(handle, &findData) == 0);
-	_findclose(handle);    // �ر��������
-	return allPath;
+        // 判断是否是目录
+        if (fs::is_directory(path))
+        {
+            // 跳过 "." 和 ".."
+            if (filename == "." || filename == "..")
+                continue;
+            
+            // 递归调用：如果是子目录，则继续遍历
+            vector<string> tempPath = getFilesList(path.string());
+            // 将子目录中的结果合并到 allPath
+            allPath.insert(allPath.end(), tempPath.begin(), tempPath.end());
+        }
+        else
+        {
+            // 如果是普通文件，检查文件名是否为 "model.pcd"
+            if (filename == "model.pcd")
+            {
+                // 根据你的逻辑决定如何存储最终结果
+                // 原代码中做了 dir.substr(1) 的处理，这里也可以相应移植
+                if (dir.size() > 1)
+                    allPath.push_back(dir.substr(1));
+                else
+                    allPath.push_back(dir);
+            }
+        }
+    }
+
+    return allPath;
 }

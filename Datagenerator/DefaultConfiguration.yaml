@@ -1,23 +1,15 @@
 %YAML:1.0
-model_path: "D:/Programfiles/Myscvp/industrial_parts_25/"
-name_of_pcd: "077"
+pre_path: "/home/robot/ros2_ws/src/Masterthesis/"
+model_path: "/home/robot/ros2_ws/src/Masterthesis/3d_models/"
+name_of_pcd: "Dragon"
 method_of_IG : 0
 octomap_resolution: 0.00625
 ground_truth_resolution: 0.002
+need_case_1: 32
+sampling_method: 0
 num_of_max_iteration: 10
 show: 0
-move_wait : 0
-nbv_net_path: "D:/jupyter_pytorch_cpu/nbv-net"
-p_unknown_upper_bound: 0.65
-p_unknown_lower_bound: 0.45
-num_of_views : 40
-cost_weight: 0.5 
-robot_cost_negtive: 0
-skip_coefficient : 10.0
-num_of_max_flow_node : -1
-interesting_threshold : 0.3
-see_threshold : 0.5
-need_threshold : 0.5
+num_of_views : 32
 color_width: 1280
 color_height: 720
 color_fx: 9.1560668945312500e+02

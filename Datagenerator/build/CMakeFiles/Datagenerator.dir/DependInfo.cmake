@@ -25,12 +25,12 @@ set(CMAKE_TARGET_DEFINITIONS_CXX
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "../"
+  "/usr/local/gurobi1200/linux64/include"
   "/usr/local/include/vtk-8.1"
   "/usr/include/eigen3"
   "/usr/local/include/pcl-1.9"
   "/usr/include/ni"
   "/usr/include/openni2"
-  "/usr/local/include"
   "/usr/local/include/opencv4"
   )
 
