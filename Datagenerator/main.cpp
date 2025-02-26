@@ -101,7 +101,7 @@ public:
 		share_data->clouds.push_back(cloud);
 		//��ת����������ϵ
 		//*share_data->cloud_final += *cloud;
-		cout << "virtual cloud get with executed time " << clock() - now_time << " ms." << endl;
+		cout << "virtual cloud get with executed time " << double(clock() - now_time) / CLOCKS_PER_SEC << " s." << endl;
 		if (share_data->show) { //��ʾ�������
 			pcl::visualization::PCLVisualizer::Ptr viewer1(new pcl::visualization::PCLVisualizer("Camera"));
 			viewer1->setBackgroundColor(255, 255, 255);
@@ -127,7 +127,9 @@ public:
 		}
 		// cout<<"1!"<<endl;
 
-		cloud_parallel.reset();
+		// cout <<cloud_parallel->size()<<endl;
+		if(cloud_parallel)cloud_parallel.reset();
+		// if(!cloud_parallel)cout<<"Im ziyi Li"<<endl;
 		// cloud_parallel->~PointCloud();
 		// cout<<"2!"<<endl;
 
@@ -599,16 +601,14 @@ public:
 	}
 
 	int label_all_view_csaes() {
-		double now_time = clock();
-		//ÿ���ӵ����ͳ������
-		int full_num = 0;
+		double now_time = clock();// 初始化计时器，用于测量程序运行时间
+		int full_num = 0;// 用于统计全局的体素数量
 		unordered_map<octomap::OcTreeKey, int, octomap::OcTreeKey::KeyHash>* all_voxel = new unordered_map<octomap::OcTreeKey, int, octomap::OcTreeKey::KeyHash>();
-		for (int i = 0; i < view_space->views.size(); i++) {
-			percept->precept(&view_space->views[i]);
-			// cout<<"out1"<<endl;
-
-			//get voxel map
-			int num = 0;
+		// 动态分配一个哈希表，用于存储所有体素及其编号的映射关系
+		for (int i = 0; i < view_space->views.size(); i++) {// 遍历所有视点
+			// cout<<i<<endl;
+			percept->precept(&view_space->views[i]);// 对当前视点进行感知处理
+			int num = 0;// 初始化当前视点的体素映射
 			unordered_map<octomap::OcTreeKey, int, octomap::OcTreeKey::KeyHash>* voxel = new unordered_map<octomap::OcTreeKey, int, octomap::OcTreeKey::KeyHash>();
 			for (int j = 0; j < share_data->clouds[i]->points.size(); j++) {
 				octomap::OcTreeKey key = share_data->ground_truth_model->coordToKey(share_data->clouds[i]->points[j].x, share_data->clouds[i]->points[j].y, share_data->clouds[i]->points[j].z);
@@ -627,6 +627,7 @@ public:
 		cout << "all virtual cloud get with executed time " << clock() - now_time << " ms." << endl;
 
 		now_time = clock();
+		cout << "debug ziyi" << share_data->view_cases.size() <<endl;
 		for (long long cas = 0; cas < share_data->view_cases.size(); cas++) { //����cas
 			if (share_data->view_cases[cas] != 134217872) continue; //for testing
 			//cout << cas << " case testing:" << endl;
@@ -676,12 +677,15 @@ public:
 					}
 				}
 			delete observed_voxel;
+			cout << "out1 " << endl;
 
 			//���ϸ������
 			views_voxels_LM* SCOP_solver = new views_voxels_LM(share_data, view_space, &chosen_views);
 			SCOP_solver->solve();
 			vector<int> need_views = SCOP_solver->get_view_id_set();
+			cout<<"out2"<<endl;			
 			delete SCOP_solver;
+			cout << "out1 " << endl;
 
 			//�������������
 			octomap::ColorOcTree* octo_model_test = new octomap::ColorOcTree(share_data->octomap_resolution);
@@ -705,6 +709,8 @@ public:
 			test.ground_truth_model = octo_model_test;
 			test.full_voxels = num_of_test;
 
+			cout << "did i reach here?1"<<endl;
+
 			//��ʼ��BBXΪ0.5
 			octomap::ColorOcTree* octo_model = new octomap::ColorOcTree(share_data->octomap_resolution);
 			for (int i = 0; i < 32; i++)
@@ -719,9 +725,14 @@ public:
 					}
 			octo_model->updateInnerOccupancy();
 
+			cout << "did i reach here?2"<<endl;
+
 			//����������
 			for (long long j = share_data->view_cases[cas], i = 0; j != 0; j >>= 1, i++)
+			{
+				cout<<j<<" : "<<i<<endl;
 				if (j&1) { //jλ��i�ӵ�
+					cout<<j<<" : "<<i<<endl;
 					test.precept(&view_space->views[i]);
 					octomap::Pointcloud cloud_octo;
 					for (auto &p : share_data->clouds[view_space->views.size()]->points) {
@@ -733,13 +744,18 @@ public:
 						if (p.z < share_data->min_z_table + share_data->octomap_resolution) octo_model->setNodeColor(p.x, p.y, p.z, 0, 0, 255);
 					}
 					octo_model->updateInnerOccupancy();
-					share_data->clouds[view_space->views.size()]->~PointCloud();
+					// share_data->clouds[view_space->views.size()]->~PointCloud();
+					share_data->clouds[view_space->views.size()].reset();
 					share_data->clouds.pop_back();
 
 				}
+			}
 			delete octo_model_test;
 			octo_model->updateInnerOccupancy();
-			octo_model->write(share_data->save_path_nbvnet + "/grid.ot");
+			// octo_model->write(share_data->save_path_nbvnet + "/grid.ot");
+
+			cout << "did i reach here?3"<<endl;
+
 
 			share_data->access_directory(share_data->save_path);
 			share_data->access_directory(share_data->save_path_nbvnet);
@@ -747,6 +763,7 @@ public:
 			ofstream fout_grid_nbvnet(share_data->save_path_nbvnet + "/grid_" + to_string(cas) + ".txt");
 			ofstream fout_view_id(share_data->save_path_nbvnet + "/id_" + to_string(cas) + ".txt");
 			ofstream fout_view_ids(share_data->save_path + "/ids_" + to_string(cas) + ".txt"); //MA-SCVP
+			octo_model->write(share_data->save_path_nbvnet + "/grid.ot");			
 			//octomap::ColorOcTree* octo_model_square = new octomap::ColorOcTree(share_data->octomap_resolution);
 			for (int i = 0; i < 32; i++)
 				for (int j = 0; j < 32; j++)
@@ -807,7 +824,9 @@ public:
 				fout_view_state_pcnbv << state[i] << '\n';
 				fout_view_score << 1.0 * score[i] / full_num << '\n';
 			}
-			cloud_out->~PointCloud();
+			// cloud_out->~PointCloud();
+			cloud_out.reset();
+			cout << "did i reach here?4"<<endl;
 
 			cout << "labed " << cas << " getted with executed time " << clock() - now_time << " ms." << endl;
 			/*if (cas == 1) {
@@ -868,12 +887,10 @@ int main()
 				if (share_data->init_voxels < 30) continue;
 				labeler->label_all_view_csaes();
 				cout<< "im here" <<endl;
-				delete labeler;
+				// delete labeler;
 				cout<< "im there" <<endl;
 				// delete share_data;
 				cout<< "im where" <<endl;
-
-
 			}
 		}
 	}
@@ -898,7 +915,6 @@ int main()
 		srand(time(0));
 		cout << "RAND_MAX is " << RAND_MAX << endl;
 		//cout << "input rot:"; int rot; cin >> rot;
-		//��������
 		int need_case_1 = 32;
 		for (int i = 0; i < names.size(); i++) {
 			for (int j = 0; j < 1; j++) {
@@ -906,18 +922,20 @@ int main()
 				//for (int k = rot; k < rot+1; k++) {
 					//LongTailSampleMethod
 					share_data = new Share_Data("../DefaultConfiguration.yaml", names[i], LongTailSampleMethod, need_case_1);
-					//��ȡ���ɺõ�NBV�ؽ��ֲ�
+					cout <<"didIreachhere?"<<endl;
 					vector<double> distrubution;
 					distrubution.resize(32);
 					for (int m = 0; m < 32; m++) distrubution[m] = 0.0;
 					for (int m = 0; m < 32; m++) {
 						ifstream fin(share_data->gt_path + names[i] + "/rotate_" + to_string(k) + "/nbv_" + to_string(m) + ".txt");
+						cout <<"didIreachhere?2"<<m<<endl;
 						if (fin.is_open()) {
 							double surface_added;
 							while (fin >> surface_added) {
 								distrubution[m] += surface_added;
 							}
 						}
+						cout <<"didIreachhere?3"<<endl;
 					}
 					ofstream fout_distrubution(share_data->gt_path + names[i] + "/rotate_" + to_string(k) + "/" + to_string(need_case_1) + "_distrubution.txt");
 					fout_distrubution << setprecision(10);
@@ -933,6 +951,7 @@ int main()
 					nbv_view_cases_by_view.resize(32);
 					long long now_case;
 					vector<long long> now_view_cases;
+					cout <<"didIreachhere?4"<<endl;
 					while (fin_view_cases >> now_case)
 					{
 						// 用内置函数 __builtin_popcountll 计算 popcount
@@ -949,24 +968,40 @@ int main()
 						now_view_cases.push_back(now_case);
 						nbv_view_cases_by_view[pc].push_back(now_case);
 					}
+					cout <<"didIreachhere?5"<<endl;
 					if (now_view_cases.size() != 0) nbv_view_cases_by_iter.push_back(now_view_cases);
 					//for (int m = 0; m < 32; m++) cout << nbv_view_cases_by_iter[m].size() << endl;
 					//for (int m = 0; m < 32; m++) cout << nbv_view_cases_by_view[m].size() << endl;
 					//���ɳ�β����
 					int sum_case_num = 0;
 					vector<vector<long long>> out_ans_longtail;
+					cout <<"didIreachhere?6"<<endl;
 					for (long long m = 1; m <= 31; m++) {
 						vector<long long> ans;
+						cout<<"pointfaultposition?"<<endl;
 						int need_case = ceil(1.0 * need_case_1 / distrubution[1] * distrubution[m]);
+						cout<<"pointfaultposition?1"<<endl;
 						sum_case_num += need_case;
+						cout<<"pointfaultposition?2"<<endl;
 						while (ans.size() != need_case) {
 							long long n = ((long long)rand() << 30) + ((long long)rand() << 15) + (long long)rand();
+							cout<<"pointfaultposition?3"<<endl;
+							// cout << "集合 nbv_view_cases_by_view[" << m << "] 的大小: " << nbv_view_cases_by_view[m].size() << endl;
+							for (size_t i = 0; i < nbv_view_cases_by_view.size(); ++i) {
+                                cout << "nbv_view_cases_by_view[" << i << "] 的大小为: " << nbv_view_cases_by_view[i].size() <<endl;
+                            }
 							n %= (long long)nbv_view_cases_by_view[m].size();
+							
+							cout<<"pointfaultposition?4"<<endl;
 							ans.push_back(nbv_view_cases_by_view[m][n]);
+							cout<<"pointfaultposition?5"<<endl;
 							nbv_view_cases_by_view[m].erase(nbv_view_cases_by_view[m].begin() + n);
+							cout<<"pointfaultposition?6"<<endl;
 						}
+						cout<<"pointfaultposition?3"<<endl;
 						out_ans_longtail.push_back(ans);
 					}
+					cout <<"didIreachhere?7"<<endl;
 					share_data->view_cases.clear();
 					ofstream fout_longtail(share_data->gt_path + names[i] + "/rotate_" + to_string(k) + "/" + to_string(need_case_1) + "_longtail_sample.txt");
 					for (int m = 0; m < out_ans_longtail.size(); m++) {
@@ -976,11 +1011,14 @@ int main()
 							share_data->view_cases.push_back(out_ans_longtail[m][n]);
 						}
 					}
+					cout <<"didIreachhere?8"<<endl;
 					fout_longtail.close();
 					labeler = new NBV_Net_Labeler(share_data, j, k);
 					labeler->label_all_view_csaes();
 					delete labeler;
+					// cout <<"didIreachhere?5"<<endl;
 					// delete share_data;
+					cout <<"didIreachhere?9"<<endl;
 
 					//NBVSampleMethod
 					share_data = new Share_Data("../DefaultConfiguration.yaml", names[i], NBVSampleMethod, need_case_1);
@@ -1008,6 +1046,7 @@ int main()
 					labeler = new NBV_Net_Labeler(share_data, j, k);
 					labeler->label_all_view_csaes();
 					delete labeler;
+					cout <<"didIreachhere?10"<<endl;
 					// delete share_data;
 				}
 			}

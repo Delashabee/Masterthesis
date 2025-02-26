@@ -401,6 +401,7 @@ public:
 		cloud_ground_truth = temp_gt;
 		//path
 		//pre_path = "D:/Data/LongTail_MA-SCVP/";
+		cout << "pre_path" << pre_path << endl;
 		gt_path = pre_path + "NBV_GT_label/";
 		pre_path += to_string(need_case_1) + "/";
 		if (sampling_method == NBVSampleMethod) {
@@ -436,7 +437,7 @@ public:
 		while (fin_view_cases >> cas) {
 			view_cases.push_back(cas);
 		}
-		//cout << "test view case num is: " << view_cases.size() << endl;
+		cout << "test view case num is: " << view_cases.size() << endl;
 	}
 
 	~Share_Data() {
@@ -505,11 +506,11 @@ public:
 		string temp;
 		for (int i = 0; i < cd.length(); i++)
 			if (cd[i] == '/') {
-				if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0755);
+				if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0777);
 				temp += cd[i];
 			}
 			else temp += cd[i];
-		if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0755);
+		if (access(temp.c_str(), 0) != 0) mkdir(temp.c_str(),0777);
 	}
 
 	void save_posetrans_to_disk(Eigen::Matrix4d& T, string cd, string name, int frames_cnt)
