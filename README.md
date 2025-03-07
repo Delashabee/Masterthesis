@@ -2,7 +2,7 @@
 
 This repository is for the test of all the 4 mode of this Datagenerator file for generating all the 3D model to the dataset.
 
-mode0 for testing ;
+##mode0 for testing##
 
 
 
